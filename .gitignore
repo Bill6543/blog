@@ -1,0 +1,55 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+go.work
+go.work.sum
+
+# Logs
+logs/
+*.log
+
+# Config (如果包含敏感信息，建议不上传)
+# configs/config.yaml
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+bin/
+
+# Frontend
+blog-frontend/node_modules/
+blog-frontend/dist/
+blog-frontend/.vite/
+
+# Upload files (可选：如果不想上传用户上传的文件)
+# static/uploads/
+
+# Test coverage
+coverage.out

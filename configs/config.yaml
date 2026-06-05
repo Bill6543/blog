@@ -1,0 +1,32 @@
+server:
+  port: "8080"
+  mode: "debug"  # debug, release, test
+
+database:
+  host: "localhost"
+  port: "3306"
+  database: "blog"
+  username: "root"
+  password: "root"
+  charset: "utf8mb4"
+  max_idle: 10
+  max_open: 100
+  parse_time: true
+  loc: "Local"
+
+jwt:
+  secret: "Kj8mNp2Qr5Tx9Wz3Ab7Cd1Ef4Gh6Ij0Lk8Mn"
+  expire_time: 24  # 小时
+
+log:
+  level: "debug"
+  file_path: "logs/app.log"
+  max_size: 50
+  max_backups: 10
+  max_age: 30
+
+coze:
+  api_key: "pat_FRAw6SH70haLDbEu5KTfVawn1ls1fpGOdIQqkFCL2oz8CMcbLWDgNqeux2cd4FFM"
+  bot_id: "7626661842072600611"
+  api_url: "https://api.coze.cn/open_api/v2/chat"
+  timeout: 30

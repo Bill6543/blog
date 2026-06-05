@@ -1,0 +1,23 @@
+.layout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px !important;
+}
+
+.logo {
+  color: white;
+  margin: 0 !important;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.nav-menu {
+  min-width: 0;
+  flex: none;
+}
+
+.user-info {
+  cursor: pointer;
+  color: white;
+}
