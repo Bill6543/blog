@@ -47,6 +47,8 @@ const (
 	InvalidTokenCode        = 2107
 	LogoutFailedCode        = 2108
 	RegistrationFailedCode  = 2109
+	TokenExpiredCode        = 2110
+	UpdateFailedCode        = 2111
 
 	// Article related errors (2201-2299)
 	ArticleNotFoundCode  = 2201
@@ -108,6 +110,8 @@ var messages = map[int]string{
 	InvalidTokenCode:        "Invalid token",
 	LogoutFailedCode:        "Failed to logout",
 	RegistrationFailedCode:  "Registration failed, please try again later",
+	TokenExpiredCode:        "Reset token has expired",
+	UpdateFailedCode:        "Failed to update",
 
 	// Article related errors
 	ArticleNotFoundCode:  "Article not found",
@@ -169,6 +173,8 @@ var errorLevels = map[int]ErrorLevel{
 	InvalidTokenCode:        LevelWarn,
 	LogoutFailedCode:        LevelError,
 	RegistrationFailedCode:  LevelError,
+	TokenExpiredCode:        LevelWarn,
+	UpdateFailedCode:        LevelError,
 
 	// Article related errors
 	ArticleNotFoundCode:  LevelWarn,
@@ -388,6 +394,14 @@ func IsUpdateSessionFailed(err error) bool {
 func IsGenerateTokenFailed(err error) bool {
 	if appErr, ok := err.(*AppError); ok {
 		return appErr.Code == GenerateTokenFailedCode
+	}
+	return false
+}
+
+// IsInvalidToken determine if token is invalid
+func IsInvalidToken(err error) bool {
+	if appErr, ok := err.(*AppError); ok {
+		return appErr.Code == InvalidTokenCode || appErr.Code == TokenExpiredCode
 	}
 	return false
 }

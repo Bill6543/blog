@@ -179,3 +179,43 @@ func (r *UserRepository) SoftDelete(userID uint) error {
 		Where("id = ?", userID).
 		Update("status", -1).Error
 }
+
+// UpdateResetToken 更新用户的重置令牌
+func (r *UserRepository) UpdateResetToken(userID uint, token string, expiresAt time.Time) error {
+	return r.db.Model(&entity.User{}).
+		Where("id = ?", userID).
+		Updates(map[string]interface{}{
+			"reset_token":            token,
+			"reset_token_expires_at": expiresAt,
+		}).Error
+}
+
+// GetByResetToken 根据重置令牌查找用户
+func (r *UserRepository) GetByResetToken(token string) (*entity.User, error) {
+	var user entity.User
+	err := r.db.Where("reset_token = ?", token).First(&user).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, errors.New(errors.UserNotFoundCode)
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
+// ClearResetToken 清空用户的重置令牌
+func (r *UserRepository) ClearResetToken(userID uint) error {
+	return r.db.Model(&entity.User{}).
+		Where("id = ?", userID).
+		Updates(map[string]interface{}{
+			"reset_token":            "",
+			"reset_token_expires_at": nil,
+		}).Error
+}
+
+// UpdatePassword 更新用户密码
+func (r *UserRepository) UpdatePassword(userID uint, hashedPassword string) error {
+	return r.db.Model(&entity.User{}).
+		Where("id = ?", userID).
+		Update("password", hashedPassword).Error
+}

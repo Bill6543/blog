@@ -62,6 +62,10 @@ const Login = () => {
             />
           </Form.Item>
 
+          <div style={{ textAlign: 'right', marginBottom: 16 }}>
+            <Link to="/forgot-password">忘记密码？</Link>
+          </div>
+
           <Form.Item>
             <Button 
               type="primary" 

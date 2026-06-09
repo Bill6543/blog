@@ -7,6 +7,7 @@ import (
 	"blog/pkg/errors"
 	"blog/pkg/logger"
 	"blog/pkg/response"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 )
@@ -132,4 +133,58 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	}
 
 	response.SuccessWithMessage(c, "登出成功", nil)
+}
+
+// ForgotPassword 忘记密码
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req dto.ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Errorf("ForgotPassword parameter validation failed: %v", err)
+		response.BadRequest(c, errors.HandleValidationError(err))
+		return
+	}
+
+	resetToken, err := h.AuthService.ForgotPassword(req.Email)
+	if err != nil {
+		// 统一错误提示，防止邮箱枚举攻击
+		switch {
+		case errors.IsUserNotFound(err):
+			logger.Warnf("Forgot password: user not found, email=%s", req.Email)
+		default:
+			logger.Errorf("ForgotPassword service error: %v", err)
+		}
+		response.SuccessWithMessage(c, "如果该邮箱已注册，重置链接将发送到您的邮箱", nil)
+		return
+	}
+
+	// 构建重置链接
+	resetURL := fmt.Sprintf("http://localhost:3000/reset-password?token=%s", resetToken)
+
+	response.SuccessWithMessage(c, "重置链接已生成", map[string]interface{}{
+		"reset_url":  resetURL,
+		"expires_in": 3600, // 1小时
+	})
+}
+
+// ResetPassword 重置密码
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req dto.ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Errorf("ResetPassword parameter validation failed: %v", err)
+		response.BadRequest(c, errors.HandleValidationError(err))
+		return
+	}
+
+	if err := h.AuthService.ResetPassword(req.Token, req.NewPassword); err != nil {
+		switch {
+		case errors.IsInvalidToken(err):
+			response.BadRequest(c, "无效的重置令牌")
+		default:
+			logger.Errorf("ResetPassword service error: %v", err)
+			response.InternalError(c, err.Error())
+		}
+		return
+	}
+
+	response.SuccessWithMessage(c, "密码重置成功，请使用新密码登录", nil)
 }

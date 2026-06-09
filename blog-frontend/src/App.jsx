@@ -5,6 +5,8 @@ import zhCN from 'antd/locale/zh_CN'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import Home from './pages/Home'
 import ArticleDetail from './pages/ArticleDetail'
 import CreateArticle from './pages/CreateArticle'
@@ -51,6 +53,8 @@ function App() {
           {/* 公开路由 */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           
           {/* 主布局路由 */}
           <Route path="/" element={<Layout />}>

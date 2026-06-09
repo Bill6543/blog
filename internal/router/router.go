@@ -37,6 +37,8 @@ func SetupRouter(handler *api.Handler, cfg *config.AppConfig, userRepo *reposito
 		{
 			auth.POST("/register", (&api.AuthHandler{Handler: handler}).Register)
 			auth.POST("/login", (&api.AuthHandler{Handler: handler}).Login)
+			auth.POST("/forgot-password", (&api.AuthHandler{Handler: handler}).ForgotPassword)
+			auth.POST("/reset-password", (&api.AuthHandler{Handler: handler}).ResetPassword)
 		}
 
 		// 公开路由（无需登录）

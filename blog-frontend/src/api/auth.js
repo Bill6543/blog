@@ -33,3 +33,21 @@ export const logout = () => {
     method: 'post',
   })
 }
+
+// 忘记密码
+export const forgotPassword = (data) => {
+  return request({
+    url: '/auth/forgot-password',
+    method: 'post',
+    data,
+  })
+}
+
+// 重置密码
+export const resetPassword = (data) => {
+  return request({
+    url: '/auth/reset-password',
+    method: 'post',
+    data,
+  })
+}

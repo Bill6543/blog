@@ -16,8 +16,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// 认证相关错误已定义在 pkg/errors 中
-
 type AuthService struct {
 	userRepo    *repository.UserRepository
 	jwtSecret   string
@@ -202,5 +200,80 @@ func (s *AuthService) Logout(userID uint) error {
 	}
 
 	logger.Debugf("User logout successfully: userID=%d", userID)
+	return nil
+}
+
+// ForgotPassword 忘记密码 - 生成重置令牌
+func (s *AuthService) ForgotPassword(email string) (string, error) {
+	// 1. 查询用户
+	user, err := s.userRepo.GetByEmail(email)
+	if err != nil {
+		logger.Warnf("Forgot password failed: email not found, email=%s", email)
+		return "", errors.New(errors.UserNotFoundCode)
+	}
+
+	// 2. 生成重置令牌
+	resetToken := uuid.New().String()
+	expiresAt := time.Now().Add(1 * time.Hour) // 1小时后过期
+
+	// 3. 保存令牌到数据库
+	if err := s.userRepo.UpdateResetToken(user.ID, resetToken, expiresAt); err != nil {
+		logger.Errorf("Forgot password failed: update reset token failed, email=%s, error=%v", email, err)
+		return "", errors.New(errors.UpdateFailedCode)
+	}
+
+	// 4. 记录日志（用于调试和审计）
+	logger.Infof("Password reset requested: email=%s, token=%s, expires_at=%s",
+		email, resetToken, expiresAt.Format("2006-01-02 15:04:05"))
+
+	logger.Debugf("Forgot password successful: email=%s", email)
+	return resetToken, nil
+}
+
+// ResetPassword 重置密码
+func (s *AuthService) ResetPassword(token, newPassword string) error {
+	// 1. 验证密码强度
+	if err := validator.ValidatePassword(newPassword); err != nil {
+		return err
+	}
+
+	// 2. 根据令牌查找用户
+	user, err := s.userRepo.GetByResetToken(token)
+	if err != nil {
+		logger.Warnf("Reset password failed: invalid token, token=%s", token)
+		return errors.New(errors.InvalidTokenCode)
+	}
+
+	// 3. 检查令牌是否过期
+	if user.ResetTokenExpiresAt == nil || time.Now().After(*user.ResetTokenExpiresAt) {
+		logger.Warnf("Reset password failed: token expired, token=%s", token)
+		return errors.New(errors.TokenExpiredCode)
+	}
+
+	// 4. 加密新密码
+	hashedPassword, err := utils.HashPassword(newPassword)
+	if err != nil {
+		logger.Errorf("Reset password failed: password hashing failed, userID=%d, error=%v", user.ID, err)
+		return errors.New(errors.PasswordHashFailedCode)
+	}
+
+	// 5. 更新密码
+	if err := s.userRepo.UpdatePassword(user.ID, hashedPassword); err != nil {
+		logger.Errorf("Reset password failed: update password failed, userID=%d, error=%v", user.ID, err)
+		return errors.New(errors.UpdateFailedCode)
+	}
+
+	// 6. 清空重置令牌
+	if err := s.userRepo.ClearResetToken(user.ID); err != nil {
+		logger.Errorf("Reset password failed: clear reset token failed, userID=%d, error=%v", user.ID, err)
+		return errors.New(errors.UpdateFailedCode)
+	}
+
+	// 7. 清空登录会话（强制用户重新登录）
+	if err := s.userRepo.UpdateLoginSession(user.ID, "", time.Time{}); err != nil {
+		logger.Warnf("Reset password: failed to clear login session, userID=%d, error=%v", user.ID, err)
+	}
+
+	logger.Infof("Reset password successful: userID=%d, username=%s", user.ID, user.Username)
 	return nil
 }
