@@ -31,7 +31,6 @@ func InitLogger(level string, filePath string, maxSize, maxBackups, maxAge int) 
 		Filename:   getLogFilePath(filePath),
 		MaxSize:    maxSize,    // 使用配置参数
 		MaxBackups: maxBackups, // 使用配置参数
-		MaxAge:     maxAge,     // 使用配置参数
 		Compress:   true,       // 压缩旧文件
 		LocalTime:  true,       // 使用本地时间
 	}
@@ -42,7 +41,7 @@ func InitLogger(level string, filePath string, maxSize, maxBackups, maxAge int) 
 	encoderConfig.LevelKey = "level"
 	encoderConfig.MessageKey = "message"
 	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder  // ✅ 彩色级别
+	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder // ✅ 彩色级别
 
 	// 创建多个输出核心
 	var cores []zapcore.Core
@@ -88,7 +87,6 @@ func getLogFilePath(filePath string) string {
 	today := time.Now().Format("2006-01-02")
 	return filepath.Join(dir, fmt.Sprintf("%s-%s%s", name, today, ext))
 }
-
 
 // Debug 调试日志
 func Debug(args ...interface{}) {

@@ -27,7 +27,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 2. 初始化日志系统（必须在最前面）
+	// 2. 初始化日志系统
 	if err := logger.InitLogger(
 		cfg.Log.Level,
 		cfg.Log.FilePath,
