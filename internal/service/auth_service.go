@@ -138,6 +138,7 @@ func (s *AuthService) Login(req dto.LoginRequest) (string, error) {
 			logger.Errorf("User login failed: update session failed, userID=%d, username=%s, error=%v", user.ID, req.Username, err)
 			return "", errors.New(errors.UpdateSessionFailedCode)
 		}
+
 		// 更新成功，退出循环
 		updateErr = nil
 		break
@@ -148,7 +149,7 @@ func (s *AuthService) Login(req dto.LoginRequest) (string, error) {
 		return "", errors.New(errors.UpdateSessionFailedCode)
 	}
 
-	// 5. 生成 JWT Token（包含 session）
+	// 5. 生成 JWT Token
 	token, err := s.GenerateToken(user, loginSession)
 	if err != nil {
 		logger.Errorf("User login failed: generate token failed, userID=%d, username=%s, error=%v", user.ID, req.Username, err)

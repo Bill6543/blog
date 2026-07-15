@@ -2,7 +2,6 @@ package api
 
 import (
 	"blog/internal/service"
-	"blog/pkg/ai"
 )
 
 // Handler 所有 Handler 的基类
@@ -15,7 +14,7 @@ type Handler struct {
 	CommentService  *service.CommentService
 	LikeService     *service.LikeService
 	UploadService   *service.UploadService
-	AIService       *ai.CozeService
+	AIService       *service.AIService
 }
 
 // NewHandler 创建 Handler 实例
@@ -28,7 +27,7 @@ func NewHandler(
 	commentService *service.CommentService,
 	likeService *service.LikeService,
 	uploadService *service.UploadService,
-	aiService *ai.CozeService,
+	aiService *service.AIService,
 ) *Handler {
 	return &Handler{
 		AuthService:     authService,

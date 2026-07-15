@@ -6,7 +6,6 @@ import (
 	"blog/internal/repository"
 	"blog/internal/router"
 	"blog/internal/service"
-	"blog/pkg/ai"
 	"blog/pkg/config"
 	"blog/pkg/database"
 	"blog/pkg/logger"
@@ -82,7 +81,7 @@ func main() {
 	tagService := service.NewTagService(tagRepo)
 	commentService := service.NewCommentService(commentRepo, articleRepo, database.GetDB())
 	likeService := service.NewLikeService(likeRepo, articleRepo, userRepo, database.GetDB())
-	aiService := ai.NewCozeService(cfg.Coze.APIKey, cfg.Coze.BotID, cfg.Coze.APIURL)
+	aiService := service.NewAIService(cfg.Coze.APIKey, cfg.Coze.BotID, cfg.Coze.APIURL)
 
 	// 7. 初始化 Handler
 	handler := api.NewHandler(authService, userService, articleService, categoryService, tagService, commentService, likeService, uploadService, aiService)

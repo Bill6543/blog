@@ -19,7 +19,7 @@ type AuthConfig struct {
 // Auth JWT 认证中间件
 func Auth(config AuthConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 获取 Token
+		// 提取 Token
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			logger.Warnf("JWT auth failed: missing authorization header, path=%s", c.Request.URL.Path)
@@ -81,7 +81,7 @@ func Auth(config AuthConfig) gin.HandlerFunc {
 
 			// 对比 session
 			if user.LoginSession != tokenSession {
-				logger.Warnf("JWT auth failed: session mismatch, userID=%d, username=%s, path=%s", 
+				logger.Warnf("JWT auth failed: session mismatch, userID=%d, username=%s, path=%s",
 					userID, user.Username, c.Request.URL.Path)
 				response.Unauthorized(c, "Your account has logged in on another device, please login again")
 				c.Abort()

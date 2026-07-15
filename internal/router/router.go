@@ -32,7 +32,7 @@ func SetupRouter(handler *api.Handler, cfg *config.AppConfig, userRepo *reposito
 	// API 路由组
 	apiGroup := r.Group("/api")
 	{
-		// 认证路由（无需登录）
+		// Auth认证路由（无需登录）
 		auth := apiGroup.Group("/auth")
 		{
 			auth.POST("/register", (&api.AuthHandler{Handler: handler}).Register)
@@ -75,7 +75,7 @@ func SetupRouter(handler *api.Handler, cfg *config.AppConfig, userRepo *reposito
 			// 查看指定用户的文章
 			protected.GET("/users/:id/articles", (&api.ArticleHandler{Handler: handler}).GetUserArticles)
 
-			// 用户管理（智能权限判断）
+			// 用户信息更新（支持本人和管理员操作）
 			protected.PUT("/users/:id", (&api.UserHandler{Handler: handler}).UpdateUserInfo)
 
 			// 文章管理（普通用户 + 管理员，需校验资源所有权）
