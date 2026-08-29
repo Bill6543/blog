@@ -2,6 +2,7 @@ package router
 
 import (
 	"blog/internal/api"
+	"blog/internal/cache"
 	"blog/internal/middleware"
 	"blog/internal/repository"
 	"blog/pkg/config"
@@ -11,7 +12,7 @@ import (
 )
 
 // SetupRouter 配置路由
-func SetupRouter(handler *api.Handler, cfg *config.AppConfig, userRepo *repository.UserRepository) *gin.Engine {
+func SetupRouter(handler *api.Handler, cfg *config.AppConfig, userRepo *repository.UserRepository, sessionCache *cache.SessionCache) *gin.Engine {
 	r := gin.New()
 
 	// 恢复中间件（使用默认配置）
@@ -64,8 +65,9 @@ func SetupRouter(handler *api.Handler, cfg *config.AppConfig, userRepo *reposito
 		// 需要认证的路由
 		protected := apiGroup.Group("")
 		protected.Use(middleware.Auth(middleware.AuthConfig{
-			Secret:   cfg.JWT.Secret,
-			UserRepo: userRepo,
+			Secret:       cfg.JWT.Secret,
+			UserRepo:     userRepo,
+			SessionCache: sessionCache,
 		}))
 		{
 			// 认证相关
@@ -103,8 +105,9 @@ func SetupRouter(handler *api.Handler, cfg *config.AppConfig, userRepo *reposito
 		// 管理员专属路由
 		adminOnly := apiGroup.Group("")
 		adminOnly.Use(middleware.Auth(middleware.AuthConfig{
-			Secret:   cfg.JWT.Secret,
-			UserRepo: userRepo,
+			Secret:       cfg.JWT.Secret,
+			UserRepo:     userRepo,
+			SessionCache: sessionCache,
 		}))
 		adminOnly.Use(middleware.IsAdmin())
 		{

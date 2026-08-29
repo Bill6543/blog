@@ -1,6 +1,7 @@
 package service
 
 import (
+	"blog/internal/cache"
 	"blog/internal/model/dto"
 	"blog/internal/model/entity"
 	"blog/internal/repository"
@@ -17,16 +18,18 @@ import (
 )
 
 type AuthService struct {
-	userRepo    *repository.UserRepository
-	jwtSecret   string
-	expireHours int
+	userRepo     *repository.UserRepository
+	sessionCache *cache.SessionCache
+	jwtSecret    string
+	expireHours  int
 }
 
-func NewAuthService(userRepo *repository.UserRepository, jwtSecret string, expireHours int) *AuthService {
+func NewAuthService(userRepo *repository.UserRepository, sessionCache *cache.SessionCache, jwtSecret string, expireHours int) *AuthService {
 	return &AuthService{
-		userRepo:    userRepo,
-		jwtSecret:   jwtSecret,
-		expireHours: expireHours,
+		userRepo:     userRepo,
+		sessionCache: sessionCache,
+		jwtSecret:    jwtSecret,
+		expireHours:  expireHours,
 	}
 }
 
@@ -149,6 +152,11 @@ func (s *AuthService) Login(req dto.LoginRequest) (string, error) {
 		return "", errors.New(errors.UpdateSessionFailedCode)
 	}
 
+	// 写入会话缓存（写穿：让旧 token 立即失效）
+	if s.sessionCache != nil {
+		_ = s.sessionCache.Set(user.ID, loginSession)
+	}
+
 	// 5. 生成 JWT Token
 	token, err := s.GenerateToken(user, loginSession)
 	if err != nil {
@@ -198,6 +206,11 @@ func (s *AuthService) Logout(userID uint) error {
 	if err := s.userRepo.UpdateLoginSession(userID, "", time.Time{}); err != nil {
 		logger.Errorf("User logout failed: update session failed, userID=%d, error=%v", userID, err)
 		return errors.New(errors.LogoutFailedCode)
+	}
+
+	// 清除会话缓存
+	if s.sessionCache != nil {
+		_ = s.sessionCache.Del(userID)
 	}
 
 	logger.Debugf("User logout successfully: userID=%d", userID)
@@ -273,6 +286,11 @@ func (s *AuthService) ResetPassword(token, newPassword string) error {
 	// 7. 清空登录会话（强制用户重新登录）
 	if err := s.userRepo.UpdateLoginSession(user.ID, "", time.Time{}); err != nil {
 		logger.Warnf("Reset password: failed to clear login session, userID=%d, error=%v", user.ID, err)
+	}
+
+	// 清除会话缓存
+	if s.sessionCache != nil {
+		_ = s.sessionCache.Del(user.ID)
 	}
 
 	logger.Infof("Reset password successful: userID=%d, username=%s", user.ID, user.Username)

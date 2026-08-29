@@ -2,6 +2,7 @@ package main
 
 import (
 	"blog/internal/api"
+	"blog/internal/cache"
 	"blog/internal/model/entity"
 	"blog/internal/repository"
 	"blog/internal/router"
@@ -64,6 +65,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	// 4.5 初始化 Redis
+	if err := database.InitRedis(&cfg.Redis); err != nil {
+		logger.Errorf("Failed to init redis: %v", err)
+		logger.Sync() // 确保刷新日志
+		os.Exit(1)
+	}
+
+	// 4.6 初始化会话缓存
+	sessionCache := cache.NewSessionCache(database.GetRedis(), time.Duration(cfg.Redis.SessionTTL)*time.Second)
+
+	// 4.7 初始化浏览量计数器
+	viewCounter := cache.NewViewCounter(database.GetRedis())
+
 	// 5. 初始化 Repository
 	userRepo := repository.NewUserRepository(database.GetDB())
 	categoryRepo := repository.NewCategoryRepository(database.GetDB())
@@ -73,21 +87,46 @@ func main() {
 	likeRepo := repository.NewLikeRepository(database.GetDB())
 
 	// 6. 初始化 Service
-	authService := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.ExpireTime)
-	userService := service.NewUserService(userRepo)
+	authService := service.NewAuthService(userRepo, sessionCache, cfg.JWT.Secret, cfg.JWT.ExpireTime)
+	userService := service.NewUserService(userRepo, sessionCache)
 	uploadService := service.NewUploadService("./static/uploads", 2*1024*1024)
-	articleService := service.NewArticleService(articleRepo, tagRepo, categoryRepo, database.GetDB())
+	articleService := service.NewArticleService(articleRepo, tagRepo, categoryRepo, viewCounter, database.GetDB())
 	categoryService := service.NewCategoryService(categoryRepo)
 	tagService := service.NewTagService(tagRepo)
 	commentService := service.NewCommentService(commentRepo, articleRepo, database.GetDB())
 	likeService := service.NewLikeService(likeRepo, articleRepo, userRepo, database.GetDB())
-	aiService := service.NewAIService(cfg.Coze.APIKey, cfg.Coze.BotID, cfg.Coze.APIURL)
+	aiService := service.NewAIService(
+		cfg.Coze.APIKey,
+		cfg.Coze.BotID,
+		cfg.Coze.APIURL,
+		time.Duration(cfg.Coze.Timeout)*time.Second,
+		time.Duration(cfg.Coze.CoverTimeout)*time.Second,
+	)
 
 	// 7. 初始化 Handler
 	handler := api.NewHandler(authService, userService, articleService, categoryService, tagService, commentService, likeService, uploadService, aiService)
 
 	// 8. 设置路由
-	r := router.SetupRouter(handler, cfg, userRepo)
+	r := router.SetupRouter(handler, cfg, userRepo, sessionCache)
+
+	// 8.5 启动浏览量定时落库任务
+	viewFlushInterval := time.Duration(cfg.Redis.ViewFlushInterval) * time.Second
+	if viewFlushInterval <= 0 {
+		viewFlushInterval = 60 * time.Second
+	}
+	viewFlushStop := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(viewFlushInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				articleService.FlushViewCounts()
+			case <-viewFlushStop:
+				return
+			}
+		}
+	}()
 
 	// 9. 创建 HTTP 服务器实例
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
@@ -118,6 +157,10 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Errorf("Server forced to shutdown: %v", err)
 	}
+
+	// 停止浏览量定时任务并做最后一次落库
+	close(viewFlushStop)
+	articleService.FlushViewCounts()
 
 	logger.Info("Server stopped")
 }

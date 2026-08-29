@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"blog/internal/cache"
 	"blog/internal/repository"
 	"blog/pkg/logger"
 	"github.com/golang-jwt/jwt/v5"
@@ -12,8 +13,9 @@ import (
 
 // AuthConfig JWT 认证配置
 type AuthConfig struct {
-	Secret   string
-	UserRepo *repository.UserRepository //用于查询最新 session
+	Secret       string
+	UserRepo     *repository.UserRepository //用于查询最新 session（缓存未命中时回源）
+	SessionCache *cache.SessionCache        //用于缓存 session，减少数据库查询
 }
 
 // Auth JWT 认证中间件
@@ -70,27 +72,44 @@ func Auth(config AuthConfig) gin.HandlerFunc {
 				return
 			}
 
-			// 查询数据库中的最新 session
-			user, err := config.UserRepo.GetByID(userID)
-			if err != nil {
-				logger.Warnf("JWT auth failed: user not found, userID=%d, path=%s", userID, c.Request.URL.Path)
-				response.Unauthorized(c, "Invalid credentials")
-				c.Abort()
-				return
+			// 提取用户名/角色（用于上下文与日志）
+			username, _ := claims["username"].(string)
+			role, _ := claims["role"].(string)
+
+			// 获取最新 session：优先读缓存，未命中时回源数据库并回填
+			latestSession := ""
+			sessionCached := false
+			if config.SessionCache != nil {
+				if s, hit, err := config.SessionCache.Get(userID); err == nil && hit {
+					latestSession = s
+					sessionCached = true
+				}
+			}
+
+			if !sessionCached {
+				user, err := config.UserRepo.GetByID(userID)
+				if err != nil {
+					logger.Warnf("JWT auth failed: user not found, userID=%d, path=%s", userID, c.Request.URL.Path)
+					response.Unauthorized(c, "Invalid credentials")
+					c.Abort()
+					return
+				}
+				latestSession = user.LoginSession
+				if config.SessionCache != nil {
+					_ = config.SessionCache.Set(userID, latestSession)
+				}
 			}
 
 			// 对比 session
-			if user.LoginSession != tokenSession {
+			if latestSession != tokenSession {
 				logger.Warnf("JWT auth failed: session mismatch, userID=%d, username=%s, path=%s",
-					userID, user.Username, c.Request.URL.Path)
+					userID, username, c.Request.URL.Path)
 				response.Unauthorized(c, "Your account has logged in on another device, please login again")
 				c.Abort()
 				return
 			}
 
 			// 将用户信息存入上下文
-			username, _ := claims["username"].(string)
-			role, _ := claims["role"].(string)
 			c.Set("user_id", userID)
 			c.Set("username", username)
 			c.Set("role", role)

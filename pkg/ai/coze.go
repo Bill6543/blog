@@ -2,6 +2,7 @@ package ai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,12 +13,20 @@ import (
 	"blog/pkg/logger"
 )
 
+// 未配置超时时的兜底值
+const (
+	defaultTimeout      = 30 * time.Second
+	defaultCoverTimeout = 120 * time.Second
+)
+
 // CozeConfig Coze配置
 type CozeConfig struct {
-	APIKey  string
-	BotID   string
-	APIURL  string
-	Timeout time.Duration
+	APIKey string
+	BotID  string
+	APIURL string
+	// Timeout 摘要生成超时；CoverTimeout 封面生成超时（文生图耗时更长，单独配置）
+	Timeout      time.Duration
+	CoverTimeout time.Duration
 }
 
 // CozeService Coze AI服务
@@ -27,23 +36,30 @@ type CozeService struct {
 }
 
 // NewCozeService 创建Coze服务实例
-func NewCozeService(apiKey, botID, apiURL string) *CozeService {
+// timeout/coverTimeout 由配置传入，传 0 时使用默认值
+func NewCozeService(apiKey, botID, apiURL string, timeout, coverTimeout time.Duration) *CozeService {
 	if apiURL == "" {
 		apiURL = "https://api.coze.cn/open_api/v2/chat"
 	}
+	if timeout <= 0 {
+		timeout = defaultTimeout
+	}
+	if coverTimeout <= 0 {
+		coverTimeout = defaultCoverTimeout
+	}
 
 	config := &CozeConfig{
-		APIKey:  apiKey,
-		BotID:   botID,
-		APIURL:  apiURL,
-		Timeout: 180 * time.Second,
+		APIKey:       apiKey,
+		BotID:        botID,
+		APIURL:       apiURL,
+		Timeout:      timeout,
+		CoverTimeout: coverTimeout,
 	}
 
 	return &CozeService{
 		config: config,
-		client: &http.Client{
-			Timeout: config.Timeout,
-		},
+		// 超时由每次请求的 context 控制，两个接口取值不同，故不设 client 级 Timeout
+		client: &http.Client{},
 	}
 }
 
@@ -98,7 +114,10 @@ func (s *CozeService) GenerateSummary(content string) (string, error) {
 
 	logger.Debugf("Coze API request: bot_id=%s, body=%s", s.config.BotID, string(reqBody))
 
-	httpReq, err := http.NewRequest("POST", s.config.APIURL, bytes.NewBuffer(reqBody))
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.Timeout)
+	defer cancel()
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", s.config.APIURL, bytes.NewBuffer(reqBody))
 	if err != nil {
 		logger.Errorf("Failed to create HTTP request: %v", err)
 		return "", fmt.Errorf("failed to create HTTP request: %w", err)
@@ -181,7 +200,10 @@ func (s *CozeService) GenerateCover(content string) (string, error) {
 
 	logger.Debugf("Coze API request for cover: bot_id=%s, body=%s", s.config.BotID, string(reqBody))
 
-	httpReq, err := http.NewRequest("POST", s.config.APIURL, bytes.NewBuffer(reqBody))
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.CoverTimeout)
+	defer cancel()
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", s.config.APIURL, bytes.NewBuffer(reqBody))
 	if err != nil {
 		logger.Errorf("Failed to create HTTP request: %v", err)
 		return "", fmt.Errorf("failed to create HTTP request: %w", err)
@@ -273,40 +295,4 @@ func (s *CozeService) GenerateCover(content string) (string, error) {
 
 	logger.Debugf("Coze cover generated successfully: url=%s", coverURL)
 	return coverURL, nil
-}
-
-// parseTags 解析标签字符串
-func parseTags(tagsStr string) []string {
-	var tags []string
-	// 简单的逗号分隔解析
-	// 实际使用时可能需要更复杂的解析逻辑
-	for _, tag := range splitTags(tagsStr) {
-		if tag != "" {
-			tags = append(tags, tag)
-		}
-	}
-	return tags
-}
-
-// splitTags 分割标签
-func splitTags(s string) []string {
-	var result []string
-	var current string
-
-	for _, ch := range s {
-		if ch == ',' || ch == '，' {
-			if current != "" {
-				result = append(result, current)
-				current = ""
-			}
-		} else if ch != ' ' && ch != '\t' && ch != '\n' {
-			current += string(ch)
-		}
-	}
-
-	if current != "" {
-		result = append(result, current)
-	}
-
-	return result
 }

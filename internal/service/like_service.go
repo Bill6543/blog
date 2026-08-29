@@ -97,10 +97,10 @@ func (s *LikeService) UnlikeArticle(articleID, userID uint) error {
 			return err
 		}
 
-		// 减少文章点赞数
+		// 减少文章点赞数（使用 GREATEST 确保不会出现负数）
 		if err := tx.Model(&entity.Article{}).
 			Where("id = ?", articleID).
-			Update("like_count", gorm.Expr("like_count - 1")).Error; err != nil {
+			Update("like_count", gorm.Expr("GREATEST(like_count - 1, 0)")).Error; err != nil {
 			return err
 		}
 

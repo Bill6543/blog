@@ -1,6 +1,7 @@
 package service
 
 import (
+	"blog/internal/cache"
 	"blog/internal/model/dto"
 	"blog/internal/model/entity"
 	"blog/internal/repository"
@@ -14,6 +15,7 @@ type ArticleService struct {
 	articleRepo  *repository.ArticleRepository
 	tagRepo      *repository.TagRepository
 	categoryRepo *repository.CategoryRepository
+	viewCounter  *cache.ViewCounter
 	db           *gorm.DB
 }
 
@@ -21,12 +23,14 @@ func NewArticleService(
 	articleRepo *repository.ArticleRepository,
 	tagRepo *repository.TagRepository,
 	categoryRepo *repository.CategoryRepository,
+	viewCounter *cache.ViewCounter,
 	db *gorm.DB,
 ) *ArticleService {
 	return &ArticleService{
 		articleRepo:  articleRepo,
 		tagRepo:      tagRepo,
 		categoryRepo: categoryRepo,
+		viewCounter:  viewCounter,
 		db:           db,
 	}
 }
@@ -297,14 +301,30 @@ func (s *ArticleService) RestoreArticle(id uint, userID uint, isAdmin bool) erro
 	return nil
 }
 
-// IncreaseViewCount 增加文章浏览量
+// IncreaseViewCount 增加文章浏览量（先累加到 Redis，定时批量落库）
 func (s *ArticleService) IncreaseViewCount(id uint) error {
-	if err := s.articleRepo.IncrementViewCount(id); err != nil {
-		logger.Errorf("Increase view count failed: articleID=%d, error=%v", id, err)
-		return err
+	if err := s.viewCounter.Incr(id); err != nil {
+		// Redis 不可用时回退到直接写库，保证浏览量不丢
+		logger.Warnf("View counter incr failed, fallback to DB: articleID=%d, error=%v", id, err)
+		return s.articleRepo.IncrementViewCount(id)
 	}
 	logger.Debugf("View count increased: articleID=%d", id)
 	return nil
+}
+
+// FlushViewCounts 将 Redis 中的浏览量增量批量落库（由后台定时任务调用）
+func (s *ArticleService) FlushViewCounts() {
+	counts, err := s.viewCounter.Drain()
+	if err != nil {
+		logger.Errorf("Flush view counts failed: drain error=%v", err)
+		return
+	}
+
+	for articleID, n := range counts {
+		if err := s.articleRepo.AddViewCount(articleID, n); err != nil {
+			logger.Errorf("Flush view counts failed: articleID=%d, count=%d, error=%v", articleID, n, err)
+		}
+	}
 }
 
 // GetUserArticles 获取指定用户的文章列表

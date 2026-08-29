@@ -1,6 +1,7 @@
 package service
 
 import (
+	"blog/internal/cache"
 	"blog/internal/model/dto"
 	"blog/internal/model/entity"
 	"blog/internal/repository"
@@ -12,11 +13,15 @@ import (
 )
 
 type UserService struct {
-	userRepo *repository.UserRepository
+	userRepo     *repository.UserRepository
+	sessionCache *cache.SessionCache
 }
 
-func NewUserService(userRepo *repository.UserRepository) *UserService {
-	return &UserService{userRepo: userRepo}
+func NewUserService(userRepo *repository.UserRepository, sessionCache *cache.SessionCache) *UserService {
+	return &UserService{
+		userRepo:     userRepo,
+		sessionCache: sessionCache,
+	}
 }
 
 // convertToPublicUserResponse 转换为公开用户响应
@@ -183,6 +188,10 @@ func (s *UserService) UpdateUserInfo(targetUserID uint, req dto.AdminUpdateUserR
 					logger.Errorf("Failed to clear session when disabling user: userID=%d, error=%v", user.ID, err)
 					return nil, errors.New(errors.SessionUpdateFailedCode)
 				}
+				// 清除会话缓存
+				if s.sessionCache != nil {
+					_ = s.sessionCache.Del(user.ID)
+				}
 			}
 			user.Status = *req.Status
 		}
@@ -213,6 +222,14 @@ func (s *UserService) DeleteUser(targetUserID uint, operatorRole string) error {
 	if err := s.userRepo.SoftDelete(user.ID); err != nil {
 		logger.Errorf("Delete user failed: database error, userID=%d, error=%v", targetUserID, err)
 		return errors.New(errors.DatabaseError)
+	}
+
+	// 清空登录会话，使被删除用户的 token 立即失效（修复删除后仍可访问的问题）
+	if err := s.userRepo.UpdateLoginSession(user.ID, "", time.Time{}); err != nil {
+		logger.Warnf("Delete user: failed to clear login session, userID=%d, error=%v", user.ID, err)
+	}
+	if s.sessionCache != nil {
+		_ = s.sessionCache.Del(user.ID)
 	}
 
 	return nil
@@ -250,6 +267,11 @@ func (s *UserService) ChangePassword(userID uint, req dto.ChangePasswordRequest)
 	if err := s.userRepo.UpdateLoginSession(userID, "", time.Time{}); err != nil {
 		logger.Errorf("Change password failed: update session failed, userID=%d, error=%v", userID, err)
 		return errors.New(errors.SessionUpdateFailedCode)
+	}
+
+	// 清除会话缓存
+	if s.sessionCache != nil {
+		_ = s.sessionCache.Del(userID)
 	}
 
 	// 更新密码

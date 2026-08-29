@@ -165,6 +165,13 @@ func (r *ArticleRepository) IncrementViewCount(id uint) error {
 		Update("view_count", gorm.Expr("view_count + 1")).Error
 }
 
+// AddViewCount 批量增加文章浏览量（用于 Redis 计数定时落库）
+func (r *ArticleRepository) AddViewCount(id uint, n int64) error {
+	return r.db.Model(&entity.Article{}).
+		Where("id = ?", id).
+		Update("view_count", gorm.Expr("view_count + ?", n)).Error
+}
+
 // IncrementLikeCount 增加点赞数
 func (r *ArticleRepository) IncrementLikeCount(id uint) error {
 	return r.db.Model(&entity.Article{}).

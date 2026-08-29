@@ -27,6 +27,16 @@ type DatabaseConfig struct {
 	Loc       string `yaml:"loc"`
 }
 
+// RedisConfig Redis 配置
+type RedisConfig struct {
+	Host              string `yaml:"host"`
+	Port              string `yaml:"port"`
+	Password          string `yaml:"password"`
+	DB                int    `yaml:"db"`
+	SessionTTL        int    `yaml:"session_ttl"`         // 会话缓存过期时间（秒）
+	ViewFlushInterval int    `yaml:"view_flush_interval"` // 浏览量定时落库间隔（秒）
+}
+
 // JWTConfig JWT 配置
 type JWTConfig struct {
 	Secret     string `yaml:"secret"`
@@ -44,16 +54,19 @@ type LogConfig struct {
 
 // CozeConfig Coze AI配置
 type CozeConfig struct {
-	APIKey  string `yaml:"api_key"`
-	BotID   string `yaml:"bot_id"`
-	APIURL  string `yaml:"api_url"`
-	Timeout int    `yaml:"timeout"`
+	APIKey string `yaml:"api_key"`
+	BotID  string `yaml:"bot_id"`
+	APIURL string `yaml:"api_url"`
+	// Timeout 摘要生成超时（秒）；CoverTimeout 封面生成超时（秒）
+	Timeout      int `yaml:"timeout"`
+	CoverTimeout int `yaml:"cover_timeout"`
 }
 
 // AppConfig 应用配置
 type AppConfig struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
+	Redis    RedisConfig    `yaml:"redis"`
 	JWT      JWTConfig      `yaml:"jwt"`
 	Log      LogConfig      `yaml:"log"`
 	Coze     CozeConfig     `yaml:"coze"`

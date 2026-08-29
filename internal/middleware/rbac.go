@@ -47,47 +47,6 @@ func IsAdmin() gin.HandlerFunc {
 	return RoleGuard("admin")
 }
 
-// IsAdminOrOwner 管理员或资源所有者校验中间件
-// 需要配合上下文中的 user_id 使用
-func IsAdminOrOwner(resourceOwnerID uint) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := GetUserIDFromContext(c)
-		if userID == 0 {
-			response.Unauthorized(c, "未登录")
-			c.Abort()
-			return
-		}
-
-		role, exists := c.Get("role")
-		if !exists {
-			response.Unauthorized(c, "未登录")
-			c.Abort()
-			return
-		}
-
-		roleStr, ok := role.(string)
-		if !ok {
-			logger.Errorf("Invalid role type in context: %T", role)
-			response.Unauthorized(c, "无效的用户角色")
-			c.Abort()
-			return
-		}
-
-		// 管理员直接放行
-		if roleStr == "admin" {
-			c.Next()
-			return
-		}
-
-		// 检查是否为资源所有者
-		if userID != resourceOwnerID {
-			logger.Warnf("Permission denied: user=%d is not owner (owner=%d), path=%s",
-				userID, resourceOwnerID, c.Request.URL.Path)
-			response.Forbidden(c, "无权操作他人资源")
-			c.Abort()
-			return
-		}
-
-		c.Next()
-	}
-}
+// 注：资源所有权（如"只能改自己的文章/评论"）的校验放在 service 层，
+// 因为需要先查库拿到资源的 owner 才能判断，中间件层拿不到。
+// 参见 article_service.go / comment_service.go 中的 PermissionDenied 分支。
